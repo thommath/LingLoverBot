@@ -107,30 +107,6 @@ class BaseBot(sc2.BotAI):
             # Path not blocked
             return worker
     
-    # Custom overridden build() to use select_worker() instead, and also try a random alternative if failing
-    async def build(self, building, near, max_distance=20, unit=None, random_alternative=False, placement_step=2):
-        """Build a building."""
-
-        if isinstance(near, sc2.unit.Unit):
-            near = near.position.to2
-        elif near is not None:
-            near = near.to2
-
-        is_valid_location = False
-        p = None
-
-        p = await self.find_placement(building, near.rounded, max_distance, random_alternative, placement_step)
-        if p is None:
-            p = await self.find_placement(building, near.rounded, max_distance, True, placement_step)
-            if p is None:
-                return sc2.data.ActionResult.CantFindPlacementLocation
-
-        unit = unit or await self.select_worker(p)
-
-        if unit is None:
-            return sc2.data.ActionResult.Error
-
-        return await self.do(unit.build(building, p))
 
     # Give an order to unit(s)
     async def order(self, units, order, target=None, silent=True):
@@ -297,7 +273,6 @@ class BaseBot(sc2.BotAI):
     async def distribute_workers(self, performanceHeavy=True, onlySaturateGas=False):
         # expansion_locations = self.expansion_locations
         # owned_expansions = self.owned_expansions
-
 
         mineralTags = [x.tag for x in self.state.units.mineral_field]
         # gasTags = [x.tag for x in self.state.units.vespene_geyser]

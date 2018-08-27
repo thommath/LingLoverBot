@@ -12,12 +12,26 @@ from base_bot import BaseBot
 
 import enum
 
+
+###
+#
+# Todos 
+# More gas
+# Start with only one overlord 
+# Upgrades
+# Invis units
+# Improve focus and kiting back and forth 
+#
+###
+
+
+
 class LingLoverBot(BaseBot):
 
     units_to_ignore = [DRONE, SCV, PROBE, EGG, LARVA, OVERLORD, OVERSEER, OBSERVER, BROODLING, INTERCEPTOR, MEDIVAC, CREEPTUMOR, CREEPTUMORBURROWED, CREEPTUMORQUEEN, CREEPTUMORMISSILE]
-    roachHydraRatio = 0.7 # 70% roaches
+    roachHydraRatio = 0.6 # 70% roaches
     droneArmyRatio = 0.5
-    army_size_minimum = 70
+    army_size_minimum = 20
     start_location = None
 
 
@@ -91,7 +105,7 @@ class LingLoverBot(BaseBot):
                     return
 
             # Make drone if we have sufficently large army
-            if self.units(DRONE).amount < 70 and self.units(DRONE).amount < self.bases.amount * 16 and self.army.amount >= self.units(DRONE).amount * self.droneArmyRatio:
+            if self.units(DRONE).amount < 70 and self.units(DRONE).amount < self.bases.amount * 16 and self.army.amount + 10 >= self.units(DRONE).amount * self.droneArmyRatio:
                 if self.can_afford(DRONE) and self.can_feed(DRONE):
                     self.combinedActions.append(larvae.random.train(DRONE))
 
@@ -241,6 +255,9 @@ class LingLoverBot(BaseBot):
         if army_count < self.army_size_minimum:
             # We have less than self.army_size_minimum army in total. Just gather at rally point
             attack_location = self.get_rally_location()
+
+        ## TODO Only attack if the enemy is close to our structures or we have a bug army 
+
         if self.remembered_enemy_units.filter(lambda unit: unit.type_id not in self.units_to_ignore).exists:
             # We have large enough army and have seen an enemy. Attack closest enemy to home
             attack_location = self.remembered_enemy_units.filter(lambda unit: unit.type_id not in self.units_to_ignore).closest_to(home_location).position
@@ -271,11 +288,40 @@ class LingLoverBot(BaseBot):
                 
                 continue # Do no further micro
                 
-            attack_position = nearby_enemy_units.closest_to(unit).position
+            
+            friendly_army_value = self.friendly_army_value(unit, 10) #20
+            enemy_army_value = self.enemy_army_value(nearby_enemy_units.closest_to(unit), 10) #30
+            army_advantage = friendly_army_value - enemy_army_value
 
-            if not self.has_order(ATTACK, unit) or not self.has_target(attack_position, unit):
-                self.combinedActions.append(unit.attack(attack_position))
+            # If our shield is low, escape a little backwards
+#            if unit.is_taking_damage and unit.shield < 20 and unit.type_id not in [ZEALOT]:
+#                escape_location = unit.position.towards(home_location, 4)
+#                if has_blink:
+#                    # Stalkers can blink
+#                    await self.order(unit, EFFECT_BLINK_STALKER, escape_location)
+#                else:
+                    # Others can move normally
+#                    if not self.has_order(MOVE, unit):
+#                        self.combinedActions.append(unit.move(escape_location))
 
+#                continue
+
+            # Do we have an army advantage?
+            if army_advantage > 0:
+                # We have a larger army. Engage enemy
+                attack_position = nearby_enemy_units.closest_to(unit).position
+
+                # If not already attacking, attack
+                if not self.has_order(ATTACK, unit) or not self.has_target(attack_position, unit):
+                    self.combinedActions.append(unit.attack(attack_position))
+                
+                # Activate guardian shield for sentries (if enemy army value is big enough)
+#                if has_guardianshield and enemy_army_value > 200:
+#                    await self.order(unit, GUARDIANSHIELD_GUARDIANSHIELD)
+            else:
+                # Others can move normally
+                if not self.has_order(MOVE, unit):
+                    self.combinedActions.append(unit.move(home_location))
 
     async def micro():
         # Micro for each individual army unit
@@ -337,7 +383,7 @@ class LingLoverBot(BaseBot):
 
     def get_rally_location(self):
         if self.units(HATCHERY).ready.exists:
-            rally_location = self.units(HATCHERY).ready.center
+            rally_location = self.units(HATCHERY).center
         else:
             rally_location = self.start_location
         return rally_location
@@ -392,7 +438,7 @@ class LingLoverBot(BaseBot):
 def main():
     sc2.run_game(sc2.maps.get("Abyssal Reef LE"), [
         Bot(Race.Zerg, LingLoverBot()),
-        Computer(Race.Terran, Difficulty.Medium)
+        Computer(Race.Protoss, Difficulty.VeryHard)
     ], realtime=False, save_replay_as="ZvT.SC2Replay")
 
 if __name__ == '__main__':
