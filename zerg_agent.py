@@ -1,26 +1,30 @@
 from functools import reduce
 from operator import or_
 import random, math, asyncio
-
+from typing import List, Dict, Set, Tuple, Any, Optional, Union # mypy type checking
+from sc2.ids.unit_typeid import UnitTypeId
+from sc2.ids.ability_id import AbilityId
+from sc2.ids.upgrade_id import UpgradeId
+from sc2.units import Units
 import sc2
 from sc2 import Race, Difficulty
 from sc2.constants import *
 from sc2.player import Bot, Computer
 from sc2.data import race_townhalls
-
+from sc2.unit import Unit
 from base_bot import BaseBot
-
+from sc2.position import Point2, Point3
 import enum
 
 
 ###
 #
 # Todos 
-# More gas
 # Start with only one overlord 
 # Upgrades
 # Invis units
 # Improve focus and kiting back and forth 
+# Fight units on higher ground
 #
 ###
 
@@ -183,9 +187,9 @@ class LingLoverBot(BaseBot):
                 await self.build(SPAWNINGPOOL, near=self.hq)
         
         # Make extractors
-        elif (self.already_pending(SPAWNINGPOOL) or self.units(SPAWNINGPOOL).exists) and self.units(EXTRACTOR).amount < 2 and not self.already_pending(EXTRACTOR) and self.units(DRONE).amount > 15:
+        elif (self.already_pending(SPAWNINGPOOL) or self.units(SPAWNINGPOOL).exists) and self.units(EXTRACTOR).amount < math.floor(1.5 * self.bases.amount) and not self.already_pending(EXTRACTOR) and self.units(DRONE).amount > 15:
             if self.can_afford(EXTRACTOR):
-                target = self.state.vespene_geyser.closest_to(self.hq)
+                target = self.state.vespene_geyser.closest_to(self.bases.random)
                 drone = self.workers.closest_to(target)
                 err = self.combinedActions.append(drone.build(EXTRACTOR, target))
 
@@ -203,6 +207,23 @@ class LingLoverBot(BaseBot):
         elif self.units(LAIR).ready and not (self.units(HYDRALISKDEN).exists or self.already_pending(HYDRALISKDEN)):
             if self.can_afford(HYDRALISKDEN):
                 await self.build(HYDRALISKDEN, near=self.hq)
+
+
+    async def expand_now(self, building: UnitTypeId=None, max_distance: Union[int, float]=10, location: Optional[Point2]=None):
+        """Takes new expansion."""
+
+        if not building:
+            # self.race is never Race.Random
+            start_townhall_type = {Race.Protoss: UnitTypeId.NEXUS, Race.Terran: UnitTypeId.COMMANDCENTER, Race.Zerg: UnitTypeId.HATCHERY}
+            building = start_townhall_type[self.race]
+
+        assert isinstance(building, UnitTypeId)
+
+        if not location:
+            location = await self.get_next_expansion()
+
+        if self.can_afford(building):
+            await self.build(building, near=location, max_distance=max_distance, random_alternative=False, placement_step=1)
 
 
     async def can_take_expansion(self):
@@ -418,7 +439,7 @@ class LingLoverBot(BaseBot):
             value += unit.health + unit.shield
 
             # Add extra army value for marine/marauder, to not under-estimate
-            if unit.type_id in [MARINE, MARAUDER]:
+            if unit.type_id in [MARINE, MARAUDER, SIEGETANK]:
                 value += 20
 
         # Count nearby cannons

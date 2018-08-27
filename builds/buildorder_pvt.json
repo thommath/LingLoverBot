@@ -1,0 +1,67 @@
+{
+  "phase": {
+    "1": {
+        "name": "GATEWAY",
+        "type": "structure",
+        "structure": false,
+        "requirement": false,
+        "supply": 16
+    },
+    "2": {
+        "name": "ASSIMILATOR",
+        "type": "structure",
+        "structure": false,
+        "requirement": false,
+        "supply": 17
+    },
+    "3": {
+        "name": "GATEWAY",
+        "type": "structure",
+        "structure": false,
+        "requirement": false,
+        "supply": 19
+    },
+    "4": {
+        "name": "CYBERNETICSCORE",
+        "type": "structure",
+        "structure": false,
+        "requirement": "GATEWAY",
+        "supply": 21
+    },
+    "5": {
+        "name": "SHIELDBATTERY",
+        "type": "structure",
+        "structure": false,
+        "requirement": "CYBERNETICSCORE",
+        "supply": 20
+    },
+    "6": {
+        "name": "ROBOTICSFACILITY",
+        "type": "structure",
+        "structure": false,
+        "requirement": "CYBERNETICSCORE",
+        "supply": 47
+    },
+    "7": {
+        "name": "GATEWAY",
+        "type": "structure",
+        "structure": false,
+        "requirement": false,
+        "supply": 47
+    },
+    "8": {
+        "name": "ROBOTICSBAY",
+        "type": "structure",
+        "structure": false,
+        "requirement": "ROBOTICSFACILITY",
+        "supply": 47
+    },
+    "9": {
+        "name": "END",
+        "type": "false",
+        "structure": false,
+        "requirement": false,
+        "supply": false
+    }
+ }
+}
