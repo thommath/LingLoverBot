@@ -14,6 +14,9 @@ oponent = Bot(Race.Protoss, CannonLoverBot())
 #from other_bots.mindbot.m1ndb0t import m1ndb0t
 #oponent = Bot(Race.Protoss, m1ndb0t())
 
+from other_bots.lucidbot.lucid_bot import LucidBot
+oponent = Bot(Race.Protoss, LucidBot())
+
 # Start game
 if __name__ == '__main__':
     if "--LadderServer" in sys.argv:

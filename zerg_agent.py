@@ -16,6 +16,9 @@ from base_bot import BaseBot
 from sc2.position import Point2, Point3
 import enum
 
+##
+## Inspired by Cannon lover bot 
+##
 
 ###
 #
@@ -25,6 +28,8 @@ import enum
 # Invis units
 # Improve focus and kiting back and forth 
 # Fight units on higher ground
+# On lost base build army to withstand another attack
+# If at home, attack
 #
 ###
 
@@ -34,7 +39,7 @@ class LingLoverBot(BaseBot):
 
     units_to_ignore = [DRONE, SCV, PROBE, EGG, LARVA, OVERLORD, OVERSEER, OBSERVER, BROODLING, INTERCEPTOR, MEDIVAC, CREEPTUMOR, CREEPTUMORBURROWED, CREEPTUMORQUEEN, CREEPTUMORMISSILE]
     roachHydraRatio = 0.6 # 70% roaches
-    droneArmyRatio = 0.5
+    droneArmyRatio = 0.4
     army_size_minimum = 20
     start_location = None
 
@@ -199,7 +204,7 @@ class LingLoverBot(BaseBot):
                 await self.build(ROACHWARREN, near=self.hq)
 
         # Make lair if we have one queen
-        elif self.units(QUEEN).amount > 0 and not (self.units(LAIR).exists or self.already_pending(LAIR)):
+        elif self.units(QUEEN).amount > 0 and not (self.units(LAIR).exists or self.already_pending(LAIR)) and self.units(ROACH).amount > 10:
             if self.can_afford(LAIR):
                 self.combinedActions.append(self.hq.build(LAIR))
 
