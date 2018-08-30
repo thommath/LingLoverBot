@@ -1,0 +1,5 @@
+builds
+other_bots
+__pycache__
+duel.py
+*.SC2Replay
