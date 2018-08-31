@@ -16,6 +16,8 @@ from base_bot import BaseBot
 from sc2.position import Point2, Point3
 import enum
 
+from build_manager import *
+
 ##
 ## Inspired by Cannon lover bot 
 ##
@@ -33,6 +35,7 @@ import enum
 # Bring overlords into fights for vision
 # Add more units it can build
 # Don't walk past enemies
+# Cheese defence
 #
 # Kind of done
 # Upgrades
@@ -51,6 +54,7 @@ class LingLoverBot(BaseBot):
     droneArmyRatio = 0.3
     army_size_minimum = 20
     start_location = None
+    min_enemy_army_value = 0
 
     async def on_step(self, iteration):
         self.combinedActions = []
@@ -63,7 +67,9 @@ class LingLoverBot(BaseBot):
 
 
         self.remember_enemy_units()
+        self.min_enemy_army_value = max(self.remembered_enemy_units.amount, self.min_enemy_army_value)
         self.remember_friendly_units()
+
         await self.cancel_buildings() # Make sure to cancel buildings under construction that are under attack
         
         if iteration == 0:
@@ -74,6 +80,7 @@ class LingLoverBot(BaseBot):
 
         await self.trainUnits()
         await self.handleBase()
+        await self.build_manager.build()
 
         await self.handleQueen()
         
@@ -97,6 +104,7 @@ class LingLoverBot(BaseBot):
 
         self.bases_under_construction = 0
         self.combinedActions = []
+        self.build_manager = BuildManager(self)
 
         self.hq = self.townhalls.first
 
@@ -125,14 +133,15 @@ class LingLoverBot(BaseBot):
                 if larvae.exists and self.can_afford(ZERGLING):
                     await self.do(larvae.random.train(ZERGLING))
 
-            # Make roaches until hydra is possible or the ratio is in favor of hydra
-            elif self.units(ROACHWARREN).ready and (not self.units(HYDRALISKDEN).ready or self.units(HYDRALISK).amount > 0 and self.units(ROACH).amount/self.units(HYDRALISK).amount > self.roachHydraRatio):
-                if self.can_afford(ROACH) and self.can_feed(ROACH):
-                    await self.do(larvae.random.train(ROACH))
-
             elif self.units(HYDRALISKDEN).ready and (self.units(HYDRALISK).amount <= 0 or self.units(ROACH).amount/self.units(HYDRALISK).amount <= self.roachHydraRatio):
                 if self.can_afford(HYDRALISK) and self.can_feed(HYDRALISK):
                     await self.do(larvae.random.train(HYDRALISK))
+
+            # Make roaches until hydra is possible or the ratio is in favor of hydra
+            elif self.units(ROACHWARREN).ready and (not self.units(HYDRALISKDEN).ready or self.units(HYDRALISK).amount == 0 or self.units(ROACH).amount/self.units(HYDRALISK).amount > self.roachHydraRatio):
+                if self.can_afford(ROACH) and self.can_feed(ROACH):
+                    await self.do(larvae.random.train(ROACH))
+
 
 
     async def handleQueen(self):
@@ -147,10 +156,8 @@ class LingLoverBot(BaseBot):
                 self.combinedActions.append(queen(EFFECT_INJECTLARVA, self.bases.closest_to(queen)))
 
     def on_building_construction_complete(self, unit):
-        if unit.type_id == HATCHERY:
-            self.bases_under_construction -= 1
-            print('base done')
-        print(unit.type_id)
+        if not self.build_manager.building_done(unit.type_id):
+            print('Building not recognized', unit.type_id)
 
 
     async def handleBase(self):
@@ -175,49 +182,7 @@ class LingLoverBot(BaseBot):
                 if mfs:
                     mf = mfs.closest_to(w)
                     self.combinedActions.append(w.gather(mf))
-
-        # Also add an extra expansion if minerals get too high
-        if self.minerals > 800:
-            prefered_base_count += 1
-        
-        # Handle expanding
-        if current_base_count < prefered_base_count and await self.can_take_expansion():
-            if self.can_afford(HATCHERY):
-                print('expanding')
-                self.bases_under_construction += 1
-                await self.expand_now()
-        
-        # Make spawnpool
-        elif not (self.units(SPAWNINGPOOL).exists or self.already_pending(SPAWNINGPOOL)):
-            if self.can_afford(SPAWNINGPOOL):
-                await self.build(SPAWNINGPOOL, near=self.hq)
-        
-        # Make extractors
-        elif (self.already_pending(SPAWNINGPOOL) or self.units(SPAWNINGPOOL).exists) and self.units(EXTRACTOR).amount < math.floor(1.45 * self.bases.amount) and not self.already_pending(EXTRACTOR) and self.units(DRONE).amount > 15 + 10 * self.units(EXTRACTOR).amount:
-            if self.can_afford(EXTRACTOR):
-                target = self.state.vespene_geyser.closest_to(self.bases.ready.random)
-                drone = self.workers.closest_to(target)
-                err = self.combinedActions.append(drone.build(EXTRACTOR, target))
-
-        # Make roachwarren
-        elif self.units(SPAWNINGPOOL).ready and not (self.units(ROACHWARREN).exists or self.already_pending(ROACHWARREN)):
-            if self.can_afford(ROACHWARREN):
-                await self.build(ROACHWARREN, near=self.hq)
-
-        # Make lair if we have one queen
-        elif self.units(QUEEN).amount > 0 and not (self.units(LAIR).exists or self.already_pending(LAIR)) and self.units(ROACH).amount > 10:
-            if self.can_afford(LAIR):
-                self.combinedActions.append(self.hq.build(LAIR))
-
-        # Make hydra den if we have lair
-        elif self.units(LAIR).ready and not (self.units(HYDRALISKDEN).exists or self.already_pending(HYDRALISKDEN)):
-            if self.can_afford(HYDRALISKDEN):
-                await self.build(HYDRALISKDEN, near=self.hq)
-
-        elif self.units(ROACHWARREN).ready and self.units(SPAWNINGPOOL).ready and not (self.units(EVOLUTIONCHAMBER).exists or self.already_pending(EVOLUTIONCHAMBER)):
-            if self.can_afford(EVOLUTIONCHAMBER):
-                await self.build(EVOLUTIONCHAMBER, near=self.hq)
-
+    
 
     async def handleUpgrades(self):
         if self.units(EVOLUTIONCHAMBER).ready.exists:
@@ -251,42 +216,6 @@ class LingLoverBot(BaseBot):
         # Overlord speed
 
 
-    async def expand_now(self, building: UnitTypeId=None, max_distance: Union[int, float]=10, location: Optional[Point2]=None):
-        """Takes new expansion."""
-
-        if not building:
-            # self.race is never Race.Random
-            start_townhall_type = {Race.Protoss: UnitTypeId.NEXUS, Race.Terran: UnitTypeId.COMMANDCENTER, Race.Zerg: UnitTypeId.HATCHERY}
-            building = start_townhall_type[self.race]
-
-        assert isinstance(building, UnitTypeId)
-
-        if not location:
-            location = await self.get_next_expansion()
-
-        if self.can_afford(building):
-            await self.build(building, near=location, max_distance=max_distance, random_alternative=False, placement_step=1)
-
-
-    async def can_take_expansion(self):
-        # Must have a valid exp location
-        location = await self.get_next_expansion()
-        if not location:
-            return False
-
-        # Must not have enemies nearby
-        if self.remembered_enemy_units.closer_than(10, location).exists:
-            return False
-
-        # Must be able to find a valid building position
-        if self.can_afford(HATCHERY):
-            position = await self.find_placement(HATCHERY, location.rounded, max_distance=10, random_alternative=False, placement_step=1)
-            if not position:
-                return False
-
-        return True
-
-
     def get_game_center_random(self, offset_x=50, offset_y=50):
         x = self.game_info.map_center.x
         y = self.game_info.map_center.y
@@ -300,9 +229,6 @@ class LingLoverBot(BaseBot):
             y += offset_y
         elif rand < 0.8:
             y -= offset_y
-
-    def get_base_build_location(self, base, min_distance=10, max_distance=20):
-        return base.position.towards(self.get_game_center_random(), random.randrange(min_distance, max_distance))
 
 
     # Movement and micro for army
