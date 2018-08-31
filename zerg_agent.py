@@ -12,11 +12,12 @@ from sc2.constants import *
 from sc2.player import Bot, Computer
 from sc2.data import race_townhalls
 from sc2.unit import Unit
-from base_bot import BaseBot
 from sc2.position import Point2, Point3
 import enum
 
+from base_bot import BaseBot
 from build_manager import *
+from unit_manager import *
 
 ##
 ## Inspired by Cannon lover bot 
@@ -78,9 +79,10 @@ class LingLoverBot(BaseBot):
         if iteration % 25 == 0:
             await self.distribute_workers()
 
-        await self.trainUnits()
+        await self.unit_build_manager.build()
+
         await self.handleBase()
-        await self.build_manager.build()
+        await self.build_manager.build(logging=True)
 
         await self.handleQueen()
         
@@ -88,9 +90,6 @@ class LingLoverBot(BaseBot):
 
         self.move_army()
         await self.do_actions(self.combinedActions)
-
-
-#        print(self.state.score)
 
 
     # Only run once at game start
@@ -104,44 +103,10 @@ class LingLoverBot(BaseBot):
 
         self.bases_under_construction = 0
         self.combinedActions = []
+        self.unit_build_manager = UnitBuildManager(self)
         self.build_manager = BuildManager(self)
 
         self.hq = self.townhalls.first
-
-
-    def can_feed(self, unit_type: UnitTypeId) -> bool:
-        """ Checks if you have enough free supply to build the unit """
-        return self.supply_left >= self._game_data.units[unit_type.value]._proto.food_required
-
-
-    async def trainUnits(self):
-        larvae = self.units(LARVA)
-
-        if larvae.exists:
-            # Make sure we have supply 
-            if self.supply_left < 2 + self.supply_used*0.1 and self.already_pending(OVERLORD) < 2 and self.supply_cap < 200:
-                if self.can_afford(OVERLORD) and larvae.exists:
-                    await self.do(larvae.random.train(OVERLORD))
-
-            # Make drone if we have sufficently large army
-            elif self.units(DRONE).amount < 70 and self.units(DRONE).amount < self.bases.amount * 16 and self.army.amount + 10 >= self.units(DRONE).amount * self.droneArmyRatio:
-                if self.can_afford(DRONE) and self.can_feed(DRONE):
-                    await self.do(larvae.random.train(DRONE))
-
-            # Make lings until roaches are available
-            elif self.units(SPAWNINGPOOL).ready and self.can_feed(ZERGLING) and not self.units(ROACHWARREN).ready:
-                if larvae.exists and self.can_afford(ZERGLING):
-                    await self.do(larvae.random.train(ZERGLING))
-
-            elif self.units(HYDRALISKDEN).ready and (self.units(HYDRALISK).amount <= 0 or self.units(ROACH).amount/self.units(HYDRALISK).amount <= self.roachHydraRatio):
-                if self.can_afford(HYDRALISK) and self.can_feed(HYDRALISK):
-                    await self.do(larvae.random.train(HYDRALISK))
-
-            # Make roaches until hydra is possible or the ratio is in favor of hydra
-            elif self.units(ROACHWARREN).ready and (not self.units(HYDRALISKDEN).ready or self.units(HYDRALISK).amount == 0 or self.units(ROACH).amount/self.units(HYDRALISK).amount > self.roachHydraRatio):
-                if self.can_afford(ROACH) and self.can_feed(ROACH):
-                    await self.do(larvae.random.train(ROACH))
-
 
 
     async def handleQueen(self):
@@ -155,17 +120,8 @@ class LingLoverBot(BaseBot):
             if AbilityId.EFFECT_INJECTLARVA in abilities:
                 self.combinedActions.append(queen(EFFECT_INJECTLARVA, self.bases.closest_to(queen)))
 
-    def on_building_construction_complete(self, unit):
-        if not self.build_manager.building_done(unit.type_id):
-            print('Building not recognized', unit.type_id)
-
 
     async def handleBase(self):
-
-        expand_every = 2.5 * 60 # Seconds
-        prefered_base_count = 1 + int(math.floor(self.get_game_time() / expand_every))
-        prefered_base_count = max(prefered_base_count, 2) # Take natural ASAP (i.e. minimum 2 bases)
-        current_base_count = self.bases.ready.filter(lambda unit: unit.ideal_harvesters >= 10).amount + self.bases_under_construction# Only count bases as active if they have at least 10 ideal harvesters (will decrease as it's mined out)
 
         # Handle extractors
         for a in self.units(EXTRACTOR):
@@ -215,20 +171,6 @@ class LingLoverBot(BaseBot):
         
         # Overlord speed
 
-
-    def get_game_center_random(self, offset_x=50, offset_y=50):
-        x = self.game_info.map_center.x
-        y = self.game_info.map_center.y
-
-        rand = random.random()
-        if rand < 0.2:
-            x += offset_x
-        elif rand < 0.4:
-            x -= offset_x
-        elif rand < 0.6:
-            y += offset_y
-        elif rand < 0.8:
-            y -= offset_y
 
 
     # Movement and micro for army
@@ -325,6 +267,10 @@ class LingLoverBot(BaseBot):
 
 
 
+    def on_building_construction_complete(self, unit):
+        if not self.build_manager.building_done(unit.type_id):
+            print('Building not recognized', unit.type_id)
+
     def get_rally_location(self):
         if self.units(HATCHERY).ready.exists:
             rally_location = self.units(HATCHERY).center
@@ -378,6 +324,12 @@ class LingLoverBot(BaseBot):
             value += unit.health
 
         return value
+
+
+    def can_feed(self, unit_type: UnitTypeId) -> bool:
+        """ Checks if you have enough free supply to build the unit """
+        return self.supply_left >= self._game_data.units[unit_type.value]._proto.food_required
+
 
 def main():
     sc2.run_game(sc2.maps.get("Abyssal Reef LE"), [

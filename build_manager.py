@@ -1,7 +1,7 @@
 from sc2.constants import *
 import math
 
-class BuildUnit():
+class BuildBuilding():
     requirements = []
     priority = -1
     unit = 0
@@ -42,7 +42,7 @@ class BuildUnit():
         return self.prefered_amount(bot) > bot.units(self.unit).amount + pending
 
 
-class Hatchery(BuildUnit):
+class Hatchery(BuildBuilding):
     priority = 2
     unit = HATCHERY
     
@@ -88,26 +88,26 @@ class Hatchery(BuildUnit):
         return self.prefered_amount(bot) > bot.bases.amount + pending
 
 
-class Spawningpool(BuildUnit):
+class Spawningpool(BuildBuilding):
     unit = SPAWNINGPOOL
     priority = 1
 
-class Roachwarren(BuildUnit):
+class Roachwarren(BuildBuilding):
     unit = ROACHWARREN
     requirements = [SPAWNINGPOOL]
     priority = 3
 
-class Hydraliskden(BuildUnit):
+class Hydraliskden(BuildBuilding):
     unit = HYDRALISKDEN
     requirements = [SPAWNINGPOOL, LAIR]
     priority = 4
 
-class Evolutionchamber(BuildUnit):
+class Evolutionchamber(BuildBuilding):
     unit = EVOLUTIONCHAMBER
     requirements = [SPAWNINGPOOL, LAIR]
     priority = 3.5
 
-class Lair(BuildUnit):
+class Lair(BuildBuilding):
     unit = LAIR
     requirements = [HATCHERY, QUEEN]
     priority = 2
@@ -116,7 +116,7 @@ class Lair(BuildUnit):
         if bot.can_afford(self.unit):
             await bot.do(bot.hq.build(self.unit))
 
-class Extractor(BuildUnit):
+class Extractor(BuildBuilding):
     unit = EXTRACTOR
     requirements = []
     priority = 3
@@ -138,23 +138,21 @@ class Extractor(BuildUnit):
 class BuildManager():
     def __init__(self, bot):
         self.bot = bot
-        self.buildings = [Hatchery(), Spawningpool(), Roachwarren(), Hydraliskden(), Lair(), Extractor(), Evolutionchamber()]
+        self.units = [Hatchery(), Spawningpool(), Roachwarren(), Hydraliskden(), Lair(), Extractor(), Evolutionchamber()]
 
-    async def build(self):
-        priority = None
+    async def build(self, logging=False):
+        for unit in sorted(self.units, key=lambda unit: unit.priority):
+            if await unit.would_build(self.bot):
+                if await unit.can_build(self.bot):
+                    await unit.build(self.bot)
 
-        for building in self.buildings:
-            if await building.would_build(self.bot) and (priority == None or priority.priority > building.priority):
-                priority = building
+                    if logging:
+                        print('Building ', unit.__class__.__name__, ' at ', self.bot.supply_used)
+                return
 
-        # print(priority)
-
-        if priority != None and await priority.can_build(self.bot):
-            print('Building ', priority.__class__.__name__)   
-            await priority.build(self.bot)
         
     def building_done(self, building_id):
-        for building in self.buildings:
+        for building in self.units:
             if building.unit == building_id:
                 building.under_construction -= 1
                 return True
