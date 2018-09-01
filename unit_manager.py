@@ -1,5 +1,5 @@
 from functools import reduce
-from build_manager import BuildBuilding, BuildManager
+from .build_manager import BuildBuilding, BuildManager
 from sc2.constants import *
 
 class BuildUnit(BuildBuilding):
@@ -36,7 +36,6 @@ class Zergling(BuildUnit):
     def prefered_amount(self, bot):
         """ We have currently a roach rush, but make some lings to defend """
         return 6
-
 
 class Roach(BuildUnit):
     unit = ROACH

@@ -15,9 +15,9 @@ from sc2.unit import Unit
 from sc2.position import Point2, Point3
 import enum
 
-from base_bot import BaseBot
-from build_manager import *
-from unit_manager import *
+from .base_bot import BaseBot
+from .build_manager import *
+from .unit_manager import *
 
 ##
 ## Inspired by Cannon lover bot 
