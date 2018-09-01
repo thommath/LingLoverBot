@@ -58,9 +58,13 @@ class LingLoverBot(BaseBot):
     min_enemy_army_value = 0
 
     async def on_step(self, iteration):
+        if iteration == 0:
+            await self.startUp()
+
         self.combinedActions = []
+
         # If base exusts update ref
-        if not self.townhalls.exists:
+        if not self.hq:
             self.hq = self.townhalls.first
 
         self.bases = self.units(HATCHERY) | self.units(LAIR)
@@ -68,16 +72,18 @@ class LingLoverBot(BaseBot):
 
 
         self.remember_enemy_units()
-        self.min_enemy_army_value = max(self.remembered_enemy_units.amount, self.min_enemy_army_value)
+        self.min_enemy_army_value = self.enemy_army_value()
         self.remember_friendly_units()
+        self.our_army_value = self.friendly_army_value()
+        self.diff_army_value = self.min_enemy_army_value - self.diff_army_value
 
         await self.cancel_buildings() # Make sure to cancel buildings under construction that are under attack
         
-        if iteration == 0:
-            await self.startUp()
 
         if iteration % 25 == 0:
             await self.distribute_workers()
+#            print(list(map(lambda unit: unit.__class__.__name__ + ' ' + str(unit.priority), sorted(self.unit_build_manager.units, key=lambda unit: unit.priority))))
+
 
         await self.unit_build_manager.build()
 
@@ -103,6 +109,7 @@ class LingLoverBot(BaseBot):
 
         self.bases_under_construction = 0
         self.combinedActions = []
+        self.diff_army_value = 0
         self.unit_build_manager = UnitBuildManager(self)
         self.build_manager = BuildManager(self)
 
@@ -280,10 +287,14 @@ class LingLoverBot(BaseBot):
 
 
         # Approximate army value by adding unit health+shield
-    def friendly_army_value(self, position, distance=10):
+    def friendly_army_value(self, position=None, distance=10):
         value = 0
 
-        for unit in self.units.not_structure.filter(lambda unit: unit.type_id not in self.units_to_ignore).closer_than(distance, position):
+        units = self.units.ready.not_structure.filter(lambda unit: unit.type_id not in self.units_to_ignore)
+        if position:
+            units = units.closer_than(distance, position)
+
+        for unit in units:
             value += unit.health + unit.shield
 
         # Count nearby cannons
@@ -301,10 +312,14 @@ class LingLoverBot(BaseBot):
         return value
 
     # Approximate army value by adding unit health+shield
-    def enemy_army_value(self, position, distance=10):
+    def enemy_army_value(self, position=None, distance=10):
         value = 0
 
-        for unit in self.remembered_enemy_units.ready.not_structure.filter(lambda unit: unit.type_id not in self.units_to_ignore).closer_than(distance, position):
+        units = self.remembered_enemy_units.ready.not_structure.filter(lambda unit: unit.type_id not in self.units_to_ignore)
+        if position:
+            units = units.closer_than(distance, position)
+
+        for unit in units:
             value += unit.health + unit.shield
 
             # Add extra army value for marine/marauder, to not under-estimate
