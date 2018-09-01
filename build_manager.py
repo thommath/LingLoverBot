@@ -43,11 +43,13 @@ class BuildBuilding():
 
 
 class Hatchery(BuildBuilding):
-    priority = 2
     unit = HATCHERY
+    priority = 2
     
     def prefered_amount(self, bot):
-        return 1 + 1/16 * bot.units(DRONE).amount
+        useful_hatcheries = bot.bases.filter(lambda base: base.ideal_harvesters > 8)
+
+        return max(1 + 1/12 * bot.units(DRONE).amount + (bot.bases.amount - useful_hatcheries.amount), bot.bases.amount + bot.minerals // 800)
 
     async def build(self, bot):
         location = await bot.get_next_expansion()
@@ -81,11 +83,8 @@ class Hatchery(BuildBuilding):
 
     # Would if I could
     async def would_build(self, bot):
-        pending = self.under_construction
-        if pending == 0 and bot.already_pending(self.unit):
-            pending = 1
 
-        return self.prefered_amount(bot) > bot.bases.amount + pending
+        return self.prefered_amount(bot) > bot.bases.amount + bot.already_pending(self.unit)
 
 
 class Spawningpool(BuildBuilding):

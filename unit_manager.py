@@ -41,7 +41,7 @@ class Drone(BuildUnit):
 
     def prefered_amount(self, bot):
         """ Build always and change priority if we have many """
-        return min(70, reduce(lambda tot, base: base.ideal_harvesters + tot, bot.townhalls, 0))
+        return min(70, 12 + bot.army.amount * bot.droneArmyRatio , reduce(lambda tot, base: base.ideal_harvesters + tot, bot.townhalls, 0))
 
 
 class Zergling(BuildUnit):
@@ -67,7 +67,7 @@ class Roach(BuildUnit):
         priority = 2
         if self.bot.units(HYDRALISK).amount > 0:
             # Change the value by a tiny bit
-            priority -= (self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount - self.bot.roachHydraRatio) * 0.01
+            priority += ((self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount) - self.bot.roachHydraRatio) * 0.01
         return priority
 
     def prefered_amount(self, bot):
@@ -84,7 +84,7 @@ class Hydralisk(BuildUnit):
         priority = 2
         if self.bot.units(HYDRALISK).amount > 0:
             # Change the value by a tiny bit
-            priority += (self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount - self.bot.roachHydraRatio) * 0.01
+            priority -= ((self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount) - self.bot.roachHydraRatio) * 0.01
         return priority
 
     def prefered_amount(self, bot):

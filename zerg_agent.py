@@ -52,7 +52,7 @@ class LingLoverBot(BaseBot):
 
     units_to_ignore = [DRONE, SCV, PROBE, EGG, LARVA, OVERLORD, OVERSEER, OBSERVER, BROODLING, INTERCEPTOR, MEDIVAC, CREEPTUMOR, CREEPTUMORBURROWED, CREEPTUMORQUEEN, CREEPTUMORMISSILE]
     roachHydraRatio = 0.7 # 70% roaches
-    droneArmyRatio = 0.3
+    droneArmyRatio = 1 # Risk level
     army_size_minimum = 20
     start_location = None
     min_enemy_army_value = 0
@@ -94,6 +94,8 @@ class LingLoverBot(BaseBot):
         
         await self.handleUpgrades()
 
+        await self.scout()
+
         self.move_army()
         await self.do_actions(self.combinedActions)
 
@@ -114,6 +116,11 @@ class LingLoverBot(BaseBot):
         self.build_manager = BuildManager(self)
 
         self.hq = self.townhalls.first
+
+
+    async def scout(self):
+        if self.units(OVERLORD).amount == 1 and self.units(OVERLORD).first.is_idle:
+            self.combinedActions.append(self.units(OVERLORD).first.move(self._game_info.start_locations[0]))
 
 
     async def handleQueen(self):
