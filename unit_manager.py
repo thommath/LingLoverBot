@@ -21,6 +21,7 @@ class BuildUnit(BuildBuilding):
 
 class Overlord(BuildUnit):
     unit = OVERLORD
+    unit_type = ['supply']
 
     @property
     def priority(self):
@@ -32,6 +33,7 @@ class Overlord(BuildUnit):
 
 class Drone(BuildUnit):
     unit = DRONE
+    unit_type = ['gathering']
 
     @property
     def priority(self):
@@ -45,6 +47,7 @@ class Drone(BuildUnit):
 class Zergling(BuildUnit):
     unit = ZERGLING
     requirements = [SPAWNINGPOOL]
+    unit_type = ['war']
 
     @property
     def priority(self):
@@ -57,6 +60,7 @@ class Zergling(BuildUnit):
 class Roach(BuildUnit):
     unit = ROACH
     requirements = [ROACHWARREN]
+    unit_type = ['war', 'tank']
 
     @property
     def priority(self):
@@ -64,7 +68,7 @@ class Roach(BuildUnit):
         if self.bot.units(HYDRALISK).amount > 0:
             # Change the value by a tiny bit
             priority -= (self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount - self.bot.roachHydraRatio) * 0.01
-        return priority - self.bot.diff_army_value
+        return priority
 
     def prefered_amount(self, bot):
         """ Build always and change priority if we have many """
@@ -73,6 +77,7 @@ class Roach(BuildUnit):
 class Hydralisk(BuildUnit):
     unit = HYDRALISK
     requirements = [HYDRALISKDEN]
+    unit_type = ['war', 'artillery']
 
     @property
     def priority(self):
@@ -80,7 +85,7 @@ class Hydralisk(BuildUnit):
         if self.bot.units(HYDRALISK).amount > 0:
             # Change the value by a tiny bit
             priority += (self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount - self.bot.roachHydraRatio) * 0.01
-        return priority - self.bot.diff_army_value
+        return priority
 
     def prefered_amount(self, bot):
         """ Build always and change priority if we have many """
@@ -92,3 +97,18 @@ class UnitBuildManager(BuildManager):
         self.bot = bot
         self.units = [Overlord(bot), Drone(bot), Zergling(bot), Roach(bot), Hydralisk(bot)]
 
+
+    async def build(self, logging=False):
+        """ Choses what unit to build based on priority and diff army value """
+        units = self.units
+        if self.bot.diff_army_value > 0:
+            units = filter(lambda unit: 'war' in unit.unit_type or 'supply', units)
+
+        for unit in sorted(units, key=lambda unit: unit.priority):
+            if await unit.would_build(self.bot):
+                if await unit.can_build(self.bot):
+                    await unit.build(self.bot)
+
+                    if logging:
+                        print('Building ', unit.__class__.__name__, ' at ', self.bot.supply_used)
+                return

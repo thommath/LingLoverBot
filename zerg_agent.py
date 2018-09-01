@@ -75,7 +75,7 @@ class LingLoverBot(BaseBot):
         self.min_enemy_army_value = self.enemy_army_value()
         self.remember_friendly_units()
         self.our_army_value = self.friendly_army_value()
-        self.diff_army_value = self.min_enemy_army_value - self.diff_army_value
+        self.diff_army_value = self.min_enemy_army_value - self.our_army_value
 
         await self.cancel_buildings() # Make sure to cancel buildings under construction that are under attack
         
@@ -290,7 +290,7 @@ class LingLoverBot(BaseBot):
     def friendly_army_value(self, position=None, distance=10):
         value = 0
 
-        units = self.units.ready.not_structure.filter(lambda unit: unit.type_id not in self.units_to_ignore)
+        units = self.units(ZERGLING).ready | self.units(ROACH).ready | self.units(HYDRALISK).ready | self.units(ULTRALISK).ready
         if position:
             units = units.closer_than(distance, position)
 
