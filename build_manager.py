@@ -149,6 +149,13 @@ class BuildManager():
                         print('Building ', unit.__class__.__name__, ' at ', self.bot.supply_used)
                 return
 
+
+    async def get_stats(self):
+        response = ''
+        for unit in self.units:
+            response += unit.__class__.__name__ + ': \nPriority: ' + str(unit.priority) + '\nPref amount: ' + str(unit.prefered_amount(self.bot))
+            response += '\n'
+        return response
         
     def building_done(self, building_id):
         for building in self.units:

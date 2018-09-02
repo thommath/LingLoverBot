@@ -1,0 +1,23 @@
+<html>
+
+<body>
+    Hello world!
+    <div id="a"></div>
+    <script>
+
+        function a() {
+            var xhttp = new XMLHttpRequest();
+            xhttp.onreadystatechange = function() {
+                if (this.readyState == 4 && this.status == 200) {
+                    document.getElementById("a").innerHTML = this.responseText;
+                    setTimeout(a, 100);
+                    console.log('a')
+                }
+            };
+            xhttp.open("GET", "localhost:8888", true);
+            xhttp.send();
+        }
+        a();
+    </script>
+</body>
+</html>

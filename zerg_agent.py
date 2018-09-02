@@ -18,7 +18,9 @@ import enum
 from .base_bot import BaseBot
 from .build_manager import *
 from .unit_manager import *
-
+from .simple_server import myHandler
+from threading import Thread
+from http.server import HTTPServer
 ##
 ## Inspired by Cannon lover bot 
 ##
@@ -37,6 +39,10 @@ from .unit_manager import *
 # Add more units it can build
 # Don't walk past enemies
 # Cheese defence
+# 
+# For server:
+# Read html from file
+# cleanup server (stop thread on done) # important
 #
 # Kind of done
 # Upgrades
@@ -97,7 +103,11 @@ class LingLoverBot(BaseBot):
         await self.scout()
 
         self.move_army()
+
+        self.simple_server.message = await self.build_manager.get_stats() + '\n\n' + await self.unit_build_manager.get_stats()
+        
         await self.do_actions(self.combinedActions)
+
 
 
     # Only run once at game start
@@ -117,6 +127,11 @@ class LingLoverBot(BaseBot):
 
         self.hq = self.townhalls.first
 
+        self.simple_server = HTTPServer(('', 8888), myHandler)
+        self.simple_server.message = 'Let\'s go'
+        
+        thread = Thread(target = self.simple_server.serve_forever)
+        thread.start()
 
     async def scout(self):
         if self.units(OVERLORD).amount == 1 and self.units(OVERLORD).first.is_idle:
