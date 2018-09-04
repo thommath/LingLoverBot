@@ -1,0 +1,36 @@
+{
+    "DRONE": {
+        "priority": {
+            "perDrones": 1
+        }
+    },
+    "ZERGLING": {
+        "priority": {
+            "perDrones": 1
+        }
+    },
+    "OVERLORD": {
+        "priority": 0.01
+    },
+    "HATCHERY": {
+        "priority": 16
+    },
+    "SPAWNINGPOOL": {
+        "priority": 16
+    },
+    "LAIR": {
+        "priority": 50
+    },
+    "ROACHWARREN": {
+        "priority": 30
+    },
+    "HYDRALISKDEN": {
+        "priority": 55
+    },
+    "EVOLUTIONCHAMBER": {
+        "priority": 30
+    },
+    "EXTRACTOR": {
+        "priority": 16
+    }
+}

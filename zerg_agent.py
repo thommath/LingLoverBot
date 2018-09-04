@@ -17,8 +17,9 @@ import enum
 
 from .base_bot import BaseBot
 from .build_manager import *
-from .unit_manager import *
-
+from .simple_server import myHandler
+from threading import Thread
+from http.server import HTTPServer
 ##
 ## Inspired by Cannon lover bot 
 ##
@@ -37,6 +38,10 @@ from .unit_manager import *
 # Add more units it can build
 # Don't walk past enemies
 # Cheese defence
+# 
+# For server:
+# Read html from file
+# cleanup server (stop thread on done) # important
 #
 # Kind of done
 # Upgrades
@@ -52,7 +57,7 @@ class LingLoverBot(BaseBot):
 
     units_to_ignore = [DRONE, SCV, PROBE, EGG, LARVA, OVERLORD, OVERSEER, OBSERVER, BROODLING, INTERCEPTOR, MEDIVAC, CREEPTUMOR, CREEPTUMORBURROWED, CREEPTUMORQUEEN, CREEPTUMORMISSILE]
     roachHydraRatio = 0.7 # 70% roaches
-    droneArmyRatio = 0.3
+    droneArmyRatio = 1 # Risk level
     army_size_minimum = 20
     start_location = None
     min_enemy_army_value = 0
@@ -85,7 +90,7 @@ class LingLoverBot(BaseBot):
 #            print(list(map(lambda unit: unit.__class__.__name__ + ' ' + str(unit.priority), sorted(self.unit_build_manager.units, key=lambda unit: unit.priority))))
 
 
-        await self.unit_build_manager.build()
+        #await self.unit_build_manager.build()
 
         await self.handleBase()
         await self.build_manager.build(logging=True)
@@ -94,8 +99,14 @@ class LingLoverBot(BaseBot):
         
         await self.handleUpgrades()
 
+        await self.scout()
+
         self.move_army()
+
+        self.simple_server.message = await self.build_manager.get_stats()
+        
         await self.do_actions(self.combinedActions)
+
 
 
     # Only run once at game start
@@ -110,10 +121,20 @@ class LingLoverBot(BaseBot):
         self.bases_under_construction = 0
         self.combinedActions = []
         self.diff_army_value = 0
-        self.unit_build_manager = UnitBuildManager(self)
+        #self.unit_build_manager = UnitBuildManager(self)
         self.build_manager = BuildManager(self)
 
         self.hq = self.townhalls.first
+
+        self.simple_server = HTTPServer(('', 8888), myHandler)
+        self.simple_server.message = 'Let\'s go'
+        
+        thread = Thread(target = self.simple_server.serve_forever)
+        thread.start()
+
+    async def scout(self):
+        if self.units(OVERLORD).amount == 1 and self.units(OVERLORD).first.is_idle:
+            self.combinedActions.append(self.units(OVERLORD).first.move(self._game_info.start_locations[0]))
 
 
     async def handleQueen(self):
@@ -245,7 +266,7 @@ class LingLoverBot(BaseBot):
 #                continue
 
             # Do we have an army advantage?
-            if army_advantage > 0 or unit.distance_to(home_location) < 6:
+            if friendly_army_value - enemy_army_value * 1.2 > 0 or unit.distance_to(self.townhalls.closest_to(unit).position) < 6:
                 # We have a larger army. Engage enemy
                 attack_position = nearby_enemy_units.closest_to(unit).position
                 possible_targets = nearby_enemy_units.in_attack_range_of(unit)
