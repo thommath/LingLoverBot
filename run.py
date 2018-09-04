@@ -5,7 +5,7 @@ from sc2.player import Bot, Computer, Human
 import random
 
 # Load bot
-from zerg_agent import LingLoverBot
+from .zerg_agent import LingLoverBot
 bot = Bot(Race.Zerg, LingLoverBot())
 
 # Start game

@@ -1,13 +1,26 @@
 from sc2.constants import *
+from functools import reduce
 import math
+import json
+
+priorities = {}
+
+with open('./LingLover/settings.json') as f:
+    priorities = json.load(f)
+
 
 class BuildBuilding():
     requirements = []
-    priority = -1
     unit = 0
+    name = ''
 
-    def __init__(self):
+    def __init__(self, bot):
+        self.bot = bot
         self.under_construction = 0
+
+    @property
+    def priority(self):
+        return priorities[self.name]['priority']
     
     def prefered_amount(self, bot):
         return 1
@@ -43,8 +56,12 @@ class BuildBuilding():
 
 
 class Hatchery(BuildBuilding):
+    name = 'HATCHERY'
     unit = HATCHERY
-    priority = 2
+
+    @property
+    def priority(self):
+        return priorities[self.name]['priority'] + 10 * (self.bot.townhalls.amount - 1)
     
     def prefered_amount(self, bot):
         useful_hatcheries = bot.bases.filter(lambda base: base.ideal_harvesters > 8)
@@ -56,7 +73,6 @@ class Hatchery(BuildBuilding):
 
         if bot.can_afford(self.unit):
             await bot.build(self.unit, near=location, max_distance=10, random_alternative=False, placement_step=1)
-            self.priority += 0.7 # Make it less priority over time
             self.under_construction += 1
             return True
         return False
@@ -88,43 +104,43 @@ class Hatchery(BuildBuilding):
 
 
 class Spawningpool(BuildBuilding):
+    name = 'SPAWNINGPOOL'
     unit = SPAWNINGPOOL
-    priority = 1
 
 class Roachwarren(BuildBuilding):
+    name = 'ROACHWARREN'
     unit = ROACHWARREN
     requirements = [SPAWNINGPOOL]
-    priority = 3
 
 class Hydraliskden(BuildBuilding):
+    name = 'HYDRALISKDEN'
     unit = HYDRALISKDEN
     requirements = [SPAWNINGPOOL, LAIR]
-    priority = 4
 
 class Evolutionchamber(BuildBuilding):
+    name = 'EVOLUTIONCHAMBER'
     unit = EVOLUTIONCHAMBER
     requirements = [SPAWNINGPOOL, LAIR]
-    priority = 3.5
 
 class Lair(BuildBuilding):
+    name = 'LAIR'
     unit = LAIR
     requirements = [HATCHERY, QUEEN]
-    priority = 2
 
     async def build(self, bot):
         if bot.can_afford(self.unit):
             await bot.do(bot.hq.build(self.unit))
 
 class Extractor(BuildBuilding):
+    name = 'EXTRACTOR'
     unit = EXTRACTOR
     requirements = []
-    priority = 3
 
     def prefered_amount(self, bot):
         if not (bot.already_pending(SPAWNINGPOOL) or bot.units(SPAWNINGPOOL).exists) or bot.units(DRONE).amount <= 15 + 10 * bot.units(EXTRACTOR).amount:
             return 0
 
-        return math.floor(1.45 * bot.bases.amount)
+        return math.floor(1.45 * bot.bases.amount) // 2
 
     async def build(self, bot):
         if bot.can_afford(EXTRACTOR):
@@ -134,10 +150,102 @@ class Extractor(BuildBuilding):
 
 
 
+
+#######
+# UNITS
+#######
+
+class BuildUnit(BuildBuilding):
+    """ Base for training units for zerg """
+
+    async def build(self, bot):
+        """ Override building build function """
+        if bot.can_afford(self.unit) and bot.can_feed(self.unit) and bot.units(LARVA).exists:
+            await bot.do(bot.units(LARVA).random.train(self.unit))
+
+
+
+class Overlord(BuildUnit):
+    name = 'OVERLORD'
+    unit = OVERLORD
+    unit_type = ['supply']
+
+    def prefered_amount(self, bot):
+        """ Make sure we always have supply, but don't make too many in the beginning """
+        return min(1 + (bot.supply_used - 5) // 9, 1 + 200 // 8)
+
+class Drone(BuildUnit):
+    name = 'DRONE'
+    unit = DRONE
+    unit_type = ['gathering']
+
+    @property
+    def priority(self):
+        return self.bot.units(self.unit).amount
+
+    def prefered_amount(self, bot):
+        """ Build always and change priority if we have many """
+        #return min(70, 12 + bot.army.amount * bot.droneArmyRatio , reduce(lambda tot, base: base.ideal_harvesters + tot, bot.townhalls, 0))
+        return 80
+
+
+class Zergling(BuildUnit):
+    name = 'ZERGLING'
+    unit = ZERGLING
+    requirements = [SPAWNINGPOOL]
+    unit_type = ['war']
+
+    @property
+    def priority(self):
+        return 24
+
+    def prefered_amount(self, bot):
+        """ We have currently a roach rush, but make some lings to defend """
+        return 6
+
+class Roach(BuildUnit):
+    name = 'ROACH'
+    unit = ROACH
+    requirements = [ROACHWARREN]
+    unit_type = ['war', 'tank']
+
+    @property
+    def priority(self):
+        priority = 35
+        if self.bot.units(HYDRALISK).amount > 0:
+            # Change the value by a tiny bit
+            priority += ((self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount) - self.bot.roachHydraRatio) * 0.01
+        return priority
+
+    def prefered_amount(self, bot):
+        """ Build always and change priority if we have many """
+        return self.bot.remembered_enemy_units.amount
+
+class Hydralisk(BuildUnit):
+    name = 'HYDRALISK'
+    unit = HYDRALISK
+    requirements = [HYDRALISKDEN]
+    unit_type = ['war', 'artillery']
+
+    @property
+    def priority(self):
+        priority = 70
+        if self.bot.units(HYDRALISK).amount > 0:
+            # Change the value by a tiny bit
+            priority -= ((self.bot.units(ROACH).amount / self.bot.units(HYDRALISK).amount) - self.bot.roachHydraRatio) * 0.01
+        return priority
+
+    def prefered_amount(self, bot):
+        """ Build always and change priority if we have many """
+        return self.bot.remembered_enemy_units.amount
+
+
+
 class BuildManager():
     def __init__(self, bot):
         self.bot = bot
-        self.units = [Hatchery(), Spawningpool(), Roachwarren(), Hydraliskden(), Lair(), Extractor(), Evolutionchamber()]
+        self.units = [Hatchery(bot), Spawningpool(bot), Roachwarren(bot), Hydraliskden(bot), Extractor(bot), Lair(bot), Evolutionchamber(bot), \
+                    Overlord(bot), Drone(bot), Zergling(bot), Roach(bot), Hydralisk(bot)]
 
     async def build(self, logging=False):
         for unit in sorted(self.units, key=lambda unit: unit.priority):
