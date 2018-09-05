@@ -26,3 +26,4 @@ if __name__ == '__main__':
             bot,
             Computer(Race.Random, Difficulty.VeryHard) # CheatInsane VeryHard
         ], realtime=False, save_replay_as="Example.SC2Replay")
+        bot.ai.stop()

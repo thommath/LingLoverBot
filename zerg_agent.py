@@ -17,9 +17,8 @@ import enum
 
 from .base_bot import BaseBot
 from .build_manager import *
-from .simple_server import myHandler
-from threading import Thread
-from http.server import HTTPServer
+from .simple_server import HttpServer
+
 ##
 ## Inspired by Cannon lover bot 
 ##
@@ -41,7 +40,6 @@ from http.server import HTTPServer
 # 
 # For server:
 # Read html from file
-# cleanup server (stop thread on done) # important
 #
 # Kind of done
 # Upgrades
@@ -53,7 +51,7 @@ from http.server import HTTPServer
 
 
 
-class LingLoverBot(BaseBot):
+class LingLoverBot(HttpServer, BaseBot):
 
     units_to_ignore = [DRONE, SCV, PROBE, EGG, LARVA, OVERLORD, OVERSEER, OBSERVER, BROODLING, INTERCEPTOR, MEDIVAC, CREEPTUMOR, CREEPTUMORBURROWED, CREEPTUMORQUEEN, CREEPTUMORMISSILE]
     roachHydraRatio = 0.7 # 70% roaches
@@ -61,6 +59,7 @@ class LingLoverBot(BaseBot):
     army_size_minimum = 20
     start_location = None
     min_enemy_army_value = 0
+    http_server = True
 
     async def on_step(self, iteration):
         if iteration == 0:
@@ -103,7 +102,8 @@ class LingLoverBot(BaseBot):
 
         self.move_army()
 
-        self.simple_server.message = await self.build_manager.get_stats()
+        if self.http_server:
+            self.simple_server.message = await self.build_manager.get_stats()
         
         await self.do_actions(self.combinedActions)
 
@@ -126,11 +126,7 @@ class LingLoverBot(BaseBot):
 
         self.hq = self.townhalls.first
 
-        self.simple_server = HTTPServer(('', 8888), myHandler)
-        self.simple_server.message = 'Let\'s go'
         
-        thread = Thread(target = self.simple_server.serve_forever)
-        thread.start()
 
     async def scout(self):
         if self.units(OVERLORD).amount == 1 and self.units(OVERLORD).first.is_idle:

@@ -4,7 +4,31 @@
  
 from http.server import BaseHTTPRequestHandler
 
+from threading import Thread
+from http.server import HTTPServer
+
 PORT_NUMBER = 8888
+
+
+class HttpServer():
+    http_server = True
+
+    def __init__(self):
+        super(HttpServer, self).__init__()
+        if not self.http_server:
+            return
+        self.simple_server = HTTPServer(('', 8888), myHandler)
+        self.simple_server.message = 'Let\'s go'
+        
+        self.server_thread = Thread(target = self.simple_server.serve_forever)
+        self.server_thread.start()
+
+    def stop(self):
+        print('stopping server')
+        self.simple_server.shutdown()
+        self.simple_server.socket.close()
+        print('server stopped')
+    
 
 #This class will handles any incoming request from
 #the browser 
